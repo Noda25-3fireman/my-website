@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireLineNavi - 消防中継ナビゲーター</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #1a1a1a; }
+        #header { background: linear-gradient(135deg, #b71c1c 0%, #801313 100%); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 1001; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .logo-text { font-size: 1.3rem; font-weight: 800; letter-spacing: 1px; }
+        .logo-sub { font-size: 0.7rem; opacity: 0.8; font-weight: normal; margin-left: 5px; }
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; }
+        #ui-panel { background: #222; color: white; padding: 15px; border-top: 2px solid #b71c1c; display: flex; justify-content: space-around; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.3); }
+        .stat-item { text-align: center; }
+        .stat-label { font-size: 0.7rem; color: #aaa; margin-bottom: 2px; }
+        .stat-value { font-size: 1.4rem; font-weight: bold; }
+        .hose-color { color: #ffd600; }
+        .pump-color { color: #4caf50; }
+        .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-blue { background: #1976d2; color: white; }
+        .btn-red { background: #d32f2f; color: white; }
+        .btn-outline { background: transparent; border: 1px solid #555; color: #ccc; }
+        .mode-info { position: absolute; top: 75px; left: 15px; z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 8px 15px; border-radius: 50px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border-left: 6px solid #b71c1c; font-size: 0.85rem; color: #333; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; color: white; display: none; flex-direction: column; align-items: center; padding-top: 20px; overflow-y: auto; }
+        .setup-card { background: #2c2c2c; padding: 25px; border-radius: 15px; width: 90%; max-width: 450px; margin-bottom: 30px; }
+        select, input[type="file"] { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; background: #3d3d3d; color: white; border: 1px solid #555; box-sizing: border-box; }
+        
+        /* 削除可能な町名バッジのスタイル */
+        .town-badge { 
+            background: #444; color: white; padding: 5px 10px; margin: 3px; 
+            border-radius: 20px; display: inline-flex; align-items: center; font-size: 0.75rem;
+            border: 1px solid #666;
+        }
+        .del-btn { 
+            margin-left: 8px; color: #ff5252; cursor: pointer; font-weight: bold; 
+            font-size: 1rem; line-height: 1; padding: 2px;
+        }
+        hr { border: 0; border-top: 1px solid #444; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div id="setup-screen" class="overlay">
+    <div class="setup-card">
+        <h2 style="margin-top:0; color:#ff5252;">🚒 FireLineNavi 設定</h2>
+        
+        <p style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;">1. 管轄エリアの設定</p>
+        <select id="pref-select" onchange="fetchCities()">
+            <option value="">都道府県を選択</option>
+            <option value="北海道">北海道</option><option value="青森県">青森県</option><option value="岩手県">岩手県</option>
+            <option value="宮城県">宮城県</option><option value="秋田県">秋田県</option><option value="山形県">山形県</option>
+            <option value="福島県">福島県</option><option value="茨城県">茨城県</option><option value="栃木県">栃木県</option>
+            <option value="群馬県">群馬県</option><option value="埼玉県">埼玉県</option><option value="千葉県">千葉県</option>
+            <option value="東京都">東京都</option><option value="神奈川県">神奈川県</option><option value="新潟県">新潟県</option>
+            <option value="富山県">富山県</option><option value="石川県">石川県</option><option value="福井県">福井県</option>
+            <option value="山梨県">山梨県</option><option value="長野県">長野県</option><option value="岐阜県">岐阜県</option>
+            <option value="静岡県">静岡県</option><option value="愛知県">愛知県</option><option value="三重県">三重県</option>
+            <option value="滋賀県">滋賀県</option><option value="京都府">京都府</option><option value="大阪府">大阪府</option>
+            <option value="兵庫県">兵庫県</option><option value="奈良県">奈良県</option><option value="和歌山県">和歌山県</option>
+            <option value="鳥取県">鳥取県</option><option value="島根県">島根県</option><option value="岡山県">岡山県</option>
+            <option value="広島県">広島県</option><option value="山口県">山口県</option><option value="徳島県">徳島県</option>
+            <option value="香川県">香川県</option><option value="愛媛県">愛媛県</option><option value="高知県">高知県</option>
+            <option value="福岡県">福岡県</option><option value="佐賀県">佐賀県</option><option value="長崎県">長崎県</option>
+            <option value="熊本県">熊本県</option><option value="大分県">大分県</option><option value="宮崎県">宮崎県</option>
+            <option value="鹿児島県">鹿児島県</option><option value="沖縄県">沖縄県</option>
+        </select>
+        <select id="city-select" onchange="fetchTowns()"><option value="">市区町村を選択</option></select>
+        <select id="town-select"><option value="">町名を選択</option></select>
+        <button class="btn btn-blue" style="width:100%;" onclick="addTown()">＋ 管轄リストに追加</button>
+        <div id="selected-list" style="margin: 15px 0; min-height: 40px; border: 1px dashed #555; padding: 10px; border-radius: 8px; display: flex; flex-wrap: wrap;"></div>
+        
+        <hr>
+
+        <p style="font-size:0.9rem; font-weight:bold; margin-bottom:5px;">2. 水利データ一括インポート</p>
+        <input type="file" id="csv-file" accept=".csv">
+        <button class="btn btn-outline" style="width:100%;" onclick="importCSV()">📂 CSVを読み込む</button>
+
+        <hr>
+        
+        <button class="btn btn-red" style="width:100%; padding:15px; font-size:1.1rem;" onclick="saveConfig()">設定を保存して開始</button>
+    </div>
+</div>
+
+<div id="header">
+    <div class="logo-text">FireLineNavi<span class="logo-sub">消防中継ナビ</span></div>
+    <div><button onclick="openSettings()" style="background:rgba(255,255,255,0.2); color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">⚙</button></div>
+</div>
+
+<div id="map"></div>
+<div id="mode-info" class="mode-info">📡 待機中...</div>
+
+<div style="display: flex; background: #222; padding: 5px 10px; justify-content: center; gap: 5px;">
+    <button class="btn btn-blue" style="flex:1" onclick="setMode('calc')">🔥 計算</button>
+    <button class="btn btn-red" style="flex:1" onclick="setMode('water')">📍 水利</button>
+    <button class="btn btn-outline" style="flex:1; color: #4caf50; border-color:#4caf50;" onclick="setMode('area')">⬡ 境界</button>
+</div>
+
+<div id="ui-panel">
+    <div class="stat-item"><div class="stat-label">延長ホース</div><div class="stat-value hose-color"><span id="hose-val">0</span><small style="font-size:0.8rem;">本</small></div></div>
+    <div class="stat-item"><div class="stat-label">中継ポンプ</div><div class="stat-value pump-color"><span id="pump-val">0</span><small style="font-size:0.8rem;">台</small></div></div>
+    <button class="btn btn-outline" onclick="resetCalc()">クリア</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let map, waterSources = [], currentMarkers = [], polyline = null, boundaryPoints = [], boundaryPolygon = null;
+    let currentMode = 'calc';
+    let config = JSON.parse(localStorage.getItem('fire_config_v19') || '{"towns":[], "manualWater":[], "boundary":[]}');
+
+    window.onload = () => { if (config.towns.length > 0) initApp(); else openSettings(); };
+    function openSettings() { document.getElementById('setup-screen').style.display = 'flex'; renderList(); }
+
+    function importCSV() {
+        const fileInput = document.getElementById('csv-file');
+        const file = fileInput.files[0];
+        if (!file) return alert("ファイルを選択してください");
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const lines = e.target.result.split(/\r\n|\n/);
+            let count = 0;
+            lines.forEach(line => {
+                const cols = line.split(',');
+                if (cols.length >= 2) {
+                    const lat = parseFloat(cols[0].trim()), lng = parseFloat(cols[1].trim());
+                    if (!isNaN(lat) && !isNaN(lng)) { config.manualWater.push({ lat, lng }); count++; }
+                }
+            });
+            alert(`${count}件読み込みました。下の保存ボタンで完了してください。`);
+        };
+        reader.readAsText(file);
+    }
+
+    async function fetchCities() {
+        const pref = document.getElementById('pref-select').value;
+        if (!pref) return;
+        const res = await fetch(`https://geoapi.heartrails.com/api/json?method=getCities&prefecture=${encodeURIComponent(pref)}`);
+        const data = await res.json();
+        const select = document.getElementById('city-select');
+        select.innerHTML = '<option value="">市区町村を選択</option>';
+        data.response.location.forEach(loc => { select.innerHTML += `<option value="${loc.city}">${loc.city}</option>`; });
+    }
+
+    async function fetchTowns() {
+        const pref = document.getElementById('pref-select').value;
+        const city = document.getElementById('city-select').value;
+        if (!city) return;
+        const res = await fetch(`https://geoapi.heartrails.com/api/json?method=getTowns&prefecture=${encodeURIComponent(pref)}&city=${encodeURIComponent(city)}`);
+        const data = await res.json();
+        const select = document.getElementById('town-select');
+        select.innerHTML = '<option value="">町名を選択</option>';
+        data.response.location.forEach(loc => {
+            const opt = document.createElement('option');
+            opt.value = loc.town; opt.dataset.lat = loc.y; opt.dataset.lon = loc.x; opt.innerText = loc.town;
+            select.appendChild(opt);
+        });
+    }
+
+    function addTown() {
+        const sel = document.getElementById('town-select').selectedOptions[0];
+        if (!sel || !sel.value) return;
+        const name = document.getElementById('city-select').value + sel.value;
+        if (!config.towns.some(t => t.name === name)) {
+            config.towns.push({ name, pos: [parseFloat(sel.dataset.lat), parseFloat(sel.dataset.lon)] });
+            renderList();
+        }
+    }
+
+    // 町名を削除する関数
+    function removeTown(index) {
+        config.towns.splice(index, 1);
+        renderList();
+    }
+
+    // 町名リストの表示（削除ボタン付き）
+    function renderList() { 
+        document.getElementById('selected-list').innerHTML = config.towns.map((t, idx) => `
+            <div class="town-badge">
+                ${t.name}
+                <span class="del-btn" onclick="removeTown(${idx})">×</span>
+            </div>
+        `).join(''); 
+    }
+
+    function saveConfig() { localStorage.setItem('fire_config_v19', JSON.stringify(config)); location.reload(); }
+
+    function setMode(mode) {
+        currentMode = mode;
+        const labels = {'calc': '🔥 計算中', 'water': '📍 水利登録中', 'area': '⬡ 境界描画中'};
+        document.getElementById('mode-info').innerHTML = `モード：<strong>${labels[mode]}</strong>`;
+    }
+
+    function initApp() {
+        document.getElementById('setup-screen').style.display = 'none';
+        const bounds = L.latLngBounds(config.towns.map(t => t.pos));
+        map = L.map('map').fitBounds(bounds, { padding: [50, 50] });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        config.manualWater.forEach(w => renderWaterMarker(w.lat, w.lng));
+        if (config.boundary.length > 0) { boundaryPoints = config.boundary; updateBoundary(); }
+        map.on('click', onMapClick);
+    }
+
+    function renderWaterMarker(lat, lng) {
+        const marker = L.circleMarker([lat, lng], { radius: 6, color: "#fff", weight: 2, fillColor: "#1565c0", fillOpacity: 0.9 }).addTo(map);
+        waterSources.push({ lat, lng, marker });
+        marker.on('contextmenu', (e) => {
+            L.DomEvent.stopPropagation(e);
+            if (confirm("水利を削除しますか？")) {
+                map.removeLayer(marker);
+                config.manualWater = config.manualWater.filter(w => w.lat !== lat || w.lng !== lng);
+                waterSources = waterSources.filter(s => s.marker !== marker);
+                localStorage.setItem('fire_config_v19', JSON.stringify(config));
+            }
+        });
+    }
+
+    function updateBoundary() {
+        if (boundaryPolygon) map.removeLayer(boundaryPolygon);
+        if (boundaryPoints.length > 2) {
+            boundaryPolygon = L.polygon(boundaryPoints, { color: '#b71c1c', weight: 4, fillColor: '#b71c1c', fillOpacity: 0.08 }).addTo(map);
+            boundaryPolygon.on('contextmenu', (e) => {
+                L.DomEvent.stopPropagation(e);
+                if(confirm("境界線をリセットしますか？")) {
+                    boundaryPoints = []; config.boundary = [];
+                    map.removeLayer(boundaryPolygon);
+                    localStorage.setItem('fire_config_v19', JSON.stringify(config));
+                }
+            });
+        }
+    }
+
+    function onMapClick(e) {
+        if (currentMode === 'water') {
+            renderWaterMarker(e.latlng.lat, e.latlng.lng);
+            config.manualWater.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+            localStorage.setItem('fire_config_v19', JSON.stringify(config));
+        } else if (currentMode === 'area') {
+            boundaryPoints.push([e.latlng.lat, e.latlng.lng]);
+            config.boundary = boundaryPoints;
+            updateBoundary();
+            localStorage.setItem('fire_config_v19', JSON.stringify(config));
+        } else {
+            resetCalc();
+            if (waterSources.length === 0) return;
+            const firePos = e.latlng;
+            const fireM = L.circleMarker(firePos, { radius: 8, fillColor: "#000", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map);
+            currentMarkers.push(fireM);
+            const nearest = waterSources.reduce((p, c) => map.distance(firePos, [c.lat, c.lng]) < map.distance(firePos, [p.lat, p.lng]) ? c : p);
+            fetch(`https://router.project-osrm.org/route/v1/foot/${nearest.lng},${nearest.lat};${firePos.lng},${firePos.lat}?overview=full&geometries=geojson`)
+                .then(r => r.json()).then(data => {
+                    const route = data.routes[0];
+                    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+                    polyline = L.polyline(coords, {color: '#ffd600', weight: 7, opacity: 0.9}).addTo(map);
+                    const dist = route.distance;
+                    const hoseCount = Math.ceil((dist * 1.05) / 20);
+                    const pumpCount = Math.floor((hoseCount - 1) / 10);
+                    document.getElementById('hose-val').innerText = hoseCount;
+                    document.getElementById('pump-val').innerText = pumpCount;
+                    if (pumpCount > 0) {
+                        const segmentCount = pumpCount + 1;
+                        const intervalDist = dist / segmentCount;
+                        for (let i = 1; i <= pumpCount; i++) {
+                            const targetDist = intervalDist * i; 
+                            let currentDist = 0, pumpCoord = coords[0];
+                            for (let j = 0; j < coords.length - 1; j++) {
+                                const d = map.distance(coords[j], coords[j+1]);
+                                if (currentDist + d >= targetDist) {
+                                    const ratio = (targetDist - currentDist) / d;
+                                    pumpCoord = [coords[j][0] + (coords[j+1][0] - coords[j][0]) * ratio, coords[j][1] + (coords[j+1][1] - coords[j][1]) * ratio];
+                                    break;
+                                }
+                                currentDist += d;
+                            }
+                            const pumpMarker = L.circleMarker(pumpCoord, { radius: 8, fillColor: '#4caf50', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+                            currentMarkers.push(pumpMarker);
+                        }
+                    }
+                });
+        }
+    }
+
+    function resetCalc() {
+        if (polyline) map.removeLayer(polyline);
+        currentMarkers.forEach(m => map.removeLayer(m));
+        currentMarkers = [];
+        document.getElementById('hose-val').innerText = "0";
+        document.getElementById('pump-val').innerText = "0";
+    }
+</script>
+</body>
+</html>
